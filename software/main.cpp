@@ -42,7 +42,7 @@ using json = nlohmann::json;
  * Defines/const
  ******************************************************************************/
 
-#define ever ;;
+#define ever ;; // lol this is funny. for(ever){} is an infinite loop
 #define eps 1e-3
 
 const int init_vel_lin_cm_s = 100;
@@ -76,6 +76,12 @@ void onHighVChange(int, void*) {}
  ******************************************************************************/
 
 
+/**
+ * Moves the specified rod to the given position in centimeters.
+ * 
+ * @param rod The rod to move.
+ * @param position_cm The target position in centimeters.
+ */
 void move_lin(int rod, double position_cm){
     /* if(rod != three_bar) return; */
     int target_cnts = clamp(
@@ -86,6 +92,12 @@ void move_lin(int rod, double position_cm){
     nodes[lin][rod].get().Motion.MovePosnStart(target_cnts, true);
 }
 
+/**
+ * Rotates the specified rod to the given position in degrees.
+ * 
+ * @param rod The rod to be rotated.
+ * @param position_deg The target position in degrees.
+ */
 void move_rot(int rod, double position_deg){
     /* if(rod != three_bar) return; */
     int target_cnts = rot_deg_to_cnts[rod] * (position_deg - cal_rot);
@@ -94,11 +106,25 @@ void move_rot(int rod, double position_deg){
 
 function<void(int, double)> mtr_move[num_axis_t] = {move_lin, move_rot};
 
+/**
+ * Sets the speed and acceleration limits for linear motion.
+ * 
+ * @param rod The rod index.
+ * @param vel_cm_per_s The desired velocity in centimeters per second.
+ * @param acc_cm_per_s2 The desired acceleration in centimeters per second squared.
+ */
 void set_speed_lin(int rod, double vel_cm_per_s, double acc_cm_per_s2){
     nodes[lin][rod].get().Motion.VelLimit = abs(vel_cm_per_s * lin_cm_to_cnts[rod]);
     nodes[lin][rod].get().Motion.AccLimit = abs(acc_cm_per_s2 * lin_cm_to_cnts[rod]);
 }
 
+/**
+ * Sets the speed and acceleration limits for a specific rod rotation.
+ * 
+ * @param rod The index of the rod.
+ * @param vel_deg_per_s The desired velocity limit in degrees per second.
+ * @param acc_deg_per_s2 The desired acceleration limit in degrees per second squared.
+ */
 void set_speed_rot(int rod, double vel_deg_per_s, double acc_deg_per_s2){
     nodes[rot][rod].get().Motion.VelLimit = vel_deg_per_s * rot_deg_to_cnts[rod];
     nodes[rot][rod].get().Motion.AccLimit = acc_deg_per_s2 * rot_deg_to_cnts[rod];
@@ -106,6 +132,9 @@ void set_speed_rot(int rod, double vel_deg_per_s, double acc_deg_per_s2){
 
 function<void(int, double, double)> mtr_set_speed[num_axis_t] = {set_speed_lin, set_speed_rot};
 
+/**
+ * Closes all ports and disables all nodes.
+ */
 void close_all(){
     sFnd::IPort&port = mgr.Ports(0);
     for(int i = 0; i < port.NodeCount(); ++i){
@@ -114,11 +143,25 @@ void close_all(){
     mgr.PortsClose();
 }
 
+/**
+ * @brief Initializes the motors.
+ * 
+ * This function initializes the motors by performing the following steps:
+ * 1. Identifies the connected motor hubs.
+ * 2. Finds available ports and opens them.
+ * 3. Arranges the nodes (motors) based on their names.
+ * 4. Enables the nodes.
+ * 5. Waits for the nodes to enable.
+ * 6. Starts homing for the applicable nodes.
+ * 7. Waits for the homing process to complete.
+ * 
+ * @return 0 if the motors are successfully initialized, -1 otherwise.
+ */
 int motors_init(){
     vector<string> comHubPorts;
 
     // Identify hubs
-    sFnd::SysManager::FindComHubPorts(comHubPorts);
+    sFnd::SysManager::FindComHubPorts(comHubPorts); // find connected motor hubs
     printf("Found %zu SC Hubs\n", comHubPorts.size());
 
     // Find available ports
@@ -249,6 +292,15 @@ int motors_init(){
  * Misc
  ******************************************************************************/
 
+/**
+ * Checks if the program should terminate.
+ * 
+ * This function uses the select system call to check if there is any input available on the standard input stream (stdin).
+ * If there is input available and the input is the character 'q', the function returns true indicating that the program should terminate.
+ * Otherwise, it returns false indicating that the program should continue running.
+ * 
+ * @return true if the program should terminate, false otherwise.
+ */
 bool should_terminate(){
     fd_set set;
     struct timeval timeout;
@@ -272,6 +324,13 @@ bool should_terminate(){
     return false;
 }
 
+/**
+ * @brief Signal handler function that handles interrupt signals.
+ * 
+ * This function is called when an interrupt signal is received. It prints a message indicating that an interrupt signal has been received and performs some cleanup operations.
+ * 
+ * @param signal The signal number that triggered the handler.
+ */
 void signal_handler(int signal) {
     cout << "Got interrupt signal, closing..." << endl;
     if (signal == SIGINT) {
@@ -282,6 +341,13 @@ void signal_handler(int signal) {
     }
 }
 
+/**
+ * Prints the status message to the console.
+ * 
+ * @param status The status message to be printed.
+ * @param log The log message to be printed (optional).
+ * @param erase Determines whether to erase the previous status message (default: true).
+ */
 void print_status(string status, string log = "", bool erase = true){
     // Assumes status string is always same length
     if(erase)
@@ -294,6 +360,13 @@ void print_status(string status, string log = "", bool erase = true){
 /******************************************************************************
  * Main
  ******************************************************************************/
+/**
+ * @brief The main entry point of the program.
+ *
+ * @param argc The number of command-line arguments.
+ * @param argv An array of C-style strings containing the command-line arguments.
+ * @return An integer representing the exit status of the program.
+ */
 int main(int argc, char** argv){
 
     /**************************************************************************
@@ -302,6 +375,9 @@ int main(int argc, char** argv){
     bool controller = false, no_motors = false;
 
     for(int i = 1; i < argc; ++i){
+        /**
+         * @brief Represents the command stored in the `argv[i]` argument.
+         */
         string cmd(argv[i]);
         if(cmd == "--controller"){
             controller = true;
@@ -323,19 +399,61 @@ int main(int argc, char** argv){
     struct socket_data {
         /* User data */
     };
+    /**
+     * @brief A vector of WebSocket clients.
+     *
+     * This vector stores pointers to WebSocket clients of type `uWS::WebSocket<false, true, socket_data>`.
+     * It is used to keep track of the connected clients in the application.
+     */
     vector<uWS::WebSocket<false, true, socket_data>*> clients;
+    /**
+     * @brief A synchronization primitive that can be used to protect shared data from being simultaneously accessed by multiple threads.
+     */
     mutex ws_mutex;
 
     // Webapp state
+    /**
+     * @brief Initialize the target positions of the rods.
+     * 
+     * This array stores the target positions of the rods. The size of the array is `num_rod_t`.
+     * Each element of the array represents the target position of a rod.
+     * 
+     * @note The initial target position for all rods is set to 0.5 (centered).
+     */
     double tgt_pos[num_rod_t] = {0.5, 0.5, 0.5, 0.5};
+    /**
+     * @brief Array to store target rotation values for rods.
+     *
+     * This array, tgt_rot, is used to store the target rotation values for the rods.
+     * The array has a size of num_rod_t and is initialized with zeros.
+     */
     double tgt_rot[num_rod_t] = {0, 0, 0, 0};
     bool in_shot = false;
+    /**
+     * @brief An array to track whether the target position has been updated for each rod.
+     *
+     * This boolean array is used to keep track of whether the target position has been updated for each rod.
+     * The array is initialized with all elements set to false (0).
+     *
+     * @note The size of the array is determined by the value of `num_rod_t`.
+     */
     bool tgt_pos_updated[num_rod_t] = {0};
+    /**
+     * @brief An array to track whether the target rotation has been updated for each rod.
+     *
+     * This boolean array is used to keep track of whether the target rotation has been updated for each rod.
+     * The array is initialized with all elements set to false (0).
+     *
+     * @note The size of the array is determined by the value of 'num_rod_t'.
+     */
     bool tgt_rot_updated[num_rod_t] = {0};
     int ws_selection = -1;
 
     struct uWS::Loop *loop;
     // Thread for web socket handling
+    /**
+     * @brief This thread runs the uWS server and handles incoming WebSocket connections and messages.
+     */
     thread uws_thread([&]() {
         loop = uWS::Loop::get();
         // C++20 acting funky and makes me specificy every field
@@ -402,8 +520,25 @@ int main(int argc, char** argv){
      **************************************************************************/
 
     mutex qtm_mutex;
+    /**
+     * @brief The position of the ball in a fast coordinate system.
+     *
+     * This vector stores the x, y, and z coordinates of the ball in a fast coordinate system.
+     * The coordinates are represented as double values.
+     */
     vector<double> ball_pos_fast = {0, 0, 0};
+    /**
+     * @brief The position of the ball in a slow motion scenario.
+     *
+     * This vector stores the x, y, and z coordinates of the ball's position in a slow motion scenario.
+     */
     vector<double> ball_pos_slow = {0, 0, 0};
+    /**
+     * @brief The velocity of the ball in three-dimensional space.
+     *
+     * This vector represents the velocity of the ball along the x, y, and z axes.
+     * The values in the vector correspond to the velocity components in the order of x, y, and z.
+     */
     vector<double> ball_vel = {0, 0, 0};
     bool ball_in_motion = false; // Crude measure of whether ball is in motion
 
@@ -412,6 +547,14 @@ int main(int argc, char** argv){
 
     double qtm_time = 0;
 
+    /**
+     * @brief The thread responsible for handling the communication with the QTM system.
+     *
+     * This thread connects to the QTM server, streams frames, and processes the received data.
+     * It continuously receives packets from the QTM system and updates the ball and rod positions
+     * based on the marker data. It also applies exponential weighted moving average (EWMA) filtering
+     * to smooth out the positions and velocities.
+     */
     thread qtm_thread([&qtm_mutex, &ball_pos_fast, &ball_pos_slow, &ball_vel, &rod_pos, &qtm_time, &rod_in_vision, &ball_in_motion]() {
         CRTProtocol rtProtocol;
 
@@ -446,6 +589,9 @@ int main(int argc, char** argv){
         /* const double gamma_pos = 0.05; */
         const double gamma_pos = 0.1;
         for(ever){
+            /**
+             * Enum representing the type of packet in the CRTPacket class.
+             */
             CRTPacket::EPacketType packetType;
             if(rtProtocol.Receive(packetType, true, 0) == CNetwork::ResponseType::success){
                 if(packetType != CRTPacket::PacketData) continue;
@@ -545,13 +691,39 @@ int main(int argc, char** argv){
     vector<motor_cmd> mtr_cmds[num_axis_t];
     queue<function<void(void)>> mtr_fns;
 
+    /**
+     * @brief The last update time for each axis in the mtr_t_last_update vector.
+     * 
+     * This vector stores the last update time for each axis in the system. The index of the vector represents the axis number.
+     * The update time is stored as a double value.
+     */
     vector<double> mtr_t_last_update[num_axis_t];
+    /**
+     * @brief The last command sent to each axis motor.
+     *
+     * This vector stores the last command sent to each axis motor. It is a vector of doubles,
+     * with each element representing the last command for a specific axis. The size of the vector
+     * is determined by the value of `num_axis_t`.
+     */
     vector<double> mtr_t_last_cmd[num_axis_t];
 
+    /**
+     * @brief Array of vectors to store the last motor command for each axis.
+     * 
+     * This variable is used to store the last motor command for each axis. It is an array of vectors, where each element of the array represents an axis and the corresponding vector stores the last motor command for that axis.
+     * 
+     * @note The size of the array is determined by the `num_axis_t` constant.
+     */
     vector<motor_cmd> mtr_last_cmd[num_axis_t];
 
     bool disable_motor_updates = false;
 
+    /**
+     * @brief The current positions of the axes.
+     *
+     * This variable is a vector of doubles that stores the current positions of the axes.
+     * The size of the vector is determined by the `num_axis_t` constant.
+     */
     vector<double> cur_pos[num_axis_t];
 
     for(int a = 0; a < num_axis_t; ++a){
@@ -578,11 +750,28 @@ int main(int argc, char** argv){
     }
 
     // This is the only thread that should ever query motors directly
+    /**
+     * @brief This thread is responsible for executing motor commands and updating motor positions.
+     *
+     * It continuously loops through the motor functions and executes them. It also updates the motor positions
+     * based on the time elapsed since the last update. This thread ensures thread safety by using a mutex to
+     * protect shared data.
+     */
     thread mtr_thread([no_motors, &mtr_mutex, &mtr_cmds, &mtr_t_last_update, &mtr_t_last_cmd, &mtr_last_cmd, &cur_pos, &disable_motor_updates, &mtr_fns]() {
         if(no_motors) return;
 
+        /**
+         * @brief The refresh time in milliseconds for the motor.
+         */
         const double mtr_refresh_t_ms = 100;
 
+        /**
+         * Executes the commands stored in the `mtr_fns` queue and updates the motor settings.
+         * This lambda function is responsible for iterating over the `mtr_fns` queue and executing each command.
+         * After executing each command, it checks if there are any changes in the motor settings (velocity, acceleration, position),
+         * and if so, it updates the motor settings accordingly.
+         * This function ensures thread safety by using a mutex to protect the shared data.
+         */
         auto exec_cmds = [&](){
             while(mtr_fns.size() > 0){
                 mtr_fns.front()();
@@ -591,10 +780,37 @@ int main(int argc, char** argv){
             for(int a = 0; a < num_axis_t; ++a){
                 for(int r = 0; r < num_rod_t; ++r){
                     // Awkward to make sure thread safe
+                    /**
+                     * @brief A vector of function objects representing moves.
+                     * 
+                     * This vector stores function objects that represent different moves. Each function object takes no arguments and returns no value.
+                     * The vector can be used to store and execute different moves in a game or simulation.
+                     */
                     vector<function<void(void)>> moves;
                     {
+                        /**
+                         * @brief A RAII-style wrapper for a mutex lock.
+                         *
+                         * The lock_guard class is a convenient way to automatically lock and unlock a mutex using the RAII (Resource Acquisition Is Initialization) idiom.
+                         * When a lock_guard object is created, it locks the associated mutex. When the lock_guard object goes out of scope, it automatically releases the lock.
+                         * This ensures that the mutex is always properly locked and unlocked, even in the presence of exceptions.
+                         *
+                         * @param m The mutex to be locked.
+                         */
                         lock_guard<mutex> lock(mtr_mutex);
+                        /**
+                         * @brief The motor command variable.
+                         * 
+                         * This variable stores the motor command for a specific action and rotation.
+                         * It is used to control the motor behavior in the program.
+                         */
                         motor_cmd cmd = mtr_cmds[a][r];
+                        /**
+                         * @brief Represents the last motor command.
+                         * 
+                         * This variable stores the last motor command that was executed for a specific motor and rotation.
+                         * It is of type `motor_cmd`.
+                         */
                         motor_cmd last_cmd = mtr_last_cmd[a][r];
 
                         if((!isnan(cmd.vel) && abs(cmd.vel - last_cmd.vel) > eps)
@@ -664,11 +880,26 @@ int main(int argc, char** argv){
     /* state_t state = state_unknown; */
     /* state_t state = state_controlled_move; */
     /* state_t state = state_uncontrolled; */
+    /**
+     * @brief The current state of the system.
+     * 
+     * This variable represents the state of the system and is used to control the behavior of the program.
+     */
     state_t state = state_defense;
     /* state_t state = state_snake; */
     /* state_t state = state_controlled_five_bar; */
 
+    /**
+     * @brief Represents the c5b task.
+     * 
+     * This variable is used to store the c5b task initialization value.
+     */
     c5b_t c5b_task = c5b_init;
+    /**
+     * @brief The cmove_task variable represents the task for cmove.
+     * 
+     * It is initialized with the value of cmove_init.
+     */
     cmove_t cmove_task = cmove_init;
     csnake_t csnake_task = csnake_init;
     double control_task_timer = mgr.TimeStampMsec();
@@ -684,8 +915,26 @@ int main(int argc, char** argv){
     /* vector<double> cmove_target_cm = {play_height/2,6}; // y is with respect to rod */
     /* vector<double> cmove_target_tol = {2,4}; */
     /* state_t cmove_next_state = state_snake; */
+    /**
+     * @brief The target position for the cmove operation in centimeters.
+     * 
+     * The `cmove_target_cm` vector represents the target position for the cmove operation.
+     * The first element of the vector represents the x-coordinate, and the second element represents the y-coordinate.
+     * The y-coordinate is measured with respect to the rod.
+     */
     vector<double> cmove_target_cm = {14,0}; // y is with respect to rod
+    /**
+     * @brief The tolerance values for the target position in the cmove function.
+     * 
+     * This vector stores the tolerance values for the target position in the cmove function.
+     * The first element represents the tolerance value for the x-coordinate, and the second element represents the tolerance value for the y-coordinate.
+     * 
+     * @note The tolerance values determine how close the actual position needs to be to the target position for the cmove function to consider the movement as complete.
+     */
     vector<double> cmove_target_tol = {2,2};
+    /**
+     * Represents the next state for the controlled five bar mechanism.
+     */
     state_t cmove_next_state = state_controlled_five_bar;
     int cmove_end_side = 1;
 
@@ -697,6 +946,9 @@ int main(int argc, char** argv){
 
     // So that motor cur_pos is updated by the first loop
     this_thread::sleep_for(chrono::microseconds(200000));
+    /**
+     * @brief The time in milliseconds.
+     */
     double time_ms = mgr.TimeStampMsec();
 
     for(ever){
@@ -705,7 +957,17 @@ int main(int argc, char** argv){
 
         double start_t = mgr.TimeStampMsec();
 
+        /**
+         * @brief The status message stream.
+         * 
+         * This stringstream object is used to store the status message that will be printed to the console.
+         */
         stringstream status;
+        /**
+         * @brief The log message stream.
+         * 
+         * This stringstream object is used to store the log message that will be printed to the console.
+         */
         stringstream log;
 
         lock_guard<mutex> qtm_lock(qtm_mutex);
@@ -713,6 +975,13 @@ int main(int argc, char** argv){
 
         
 
+        /**
+         * @brief Represents the position data in JSON format.
+         * 
+         * This JSON object contains information about the positions of various elements in the game.
+         * It includes the positions of the blue and red players, their rotations, and the position of the ball.
+         * The positions are represented as ratios relative to the range of motion of each element.
+         */
         json positionData = {
             {"type", "pos"},
             {"bluepos", {
@@ -753,6 +1022,9 @@ int main(int argc, char** argv){
         /* static int frame = 0; */
         /* status << "Frame: " << ++frame << endl; */
         /* status << "QTM time: " << qtm_time << endl; */
+        /**
+         * @brief The message variable stores the JSON representation of the position data.
+         */
         string message = positionData.dump();
 
         {
@@ -764,10 +1036,13 @@ int main(int argc, char** argv){
             }
         }
 
+        /**
+         * Represents the time difference from the previous timestamp to the current time.
+         */
         double dt_ms = mgr.TimeStampMsec() - time_ms;
         time_ms = mgr.TimeStampMsec();
 
-
+        // if the machine is being controlled with a gamepad
         if(controller){
             for(int r = 0; r < num_rod_t; ++r){
 
@@ -792,9 +1067,21 @@ int main(int argc, char** argv){
             if(in_shot) in_shot = false;
         // Yes, else switch is just as much as a thing as else if
         } else switch(state){
+        /**
+         * Normal defense
+         */
         case state_defense:
         {
+            /**
+             * @brief the rod that's in front of the ball
+             */
             int front;
+            /**
+             * @brief Represents the closest rod to the ball position.
+             *
+             * The `closest` variable is a pair that consists of a `side_t` value representing the side of the rod and a `rod_t` value representing the rod number.
+             * It stores the information about the closest rod to the ball position.
+             */
             pair<side_t, rod_t> closest = closest_rod(ball_pos_fast[1]);
             if(closest.first == bot){
                 /* break; */
@@ -812,9 +1099,26 @@ int main(int argc, char** argv){
             /* ball_vel = {20,-200,0}; */
             double cooldown_time = 25;
 
+            /**
+             * @brief The offset from the player to the goalie.
+             *
+             * This variable represents the distance between the player and the goalie.
+             * It is used to determine the positioning of the player relative to the goalie.
+             */
             double offset_goalie = plr_offset(1, goalie);
             double offset_two_bar = plr_offset(0, two_bar);
 
+            /**
+             * Moves the motor to a specified position with a given velocity and acceleration.
+             *
+             * @param pos The desired position of the motor.
+             * @param vel The desired velocity of the motor.
+             * @param accel The desired acceleration of the motor.
+             * @param plr The player value.
+             * @param rod The rod value.
+             * @param period The time period in milliseconds.
+             * @param dx The difference threshold for position comparison.
+             */
             auto move_motor = [&](double pos, double vel, double accel, int plr, int rod, double period, double dx){
                 double offset = plr_offset(plr, rod);
                 if(time_ms - mtr_t_last_cmd[lin][rod] > period && abs(pos - offset - mtr_last_cmd[lin][rod].pos) > dx){
@@ -822,6 +1126,9 @@ int main(int argc, char** argv){
                 }
             };
 
+            /**
+             * @brief The rod angle to catch the ball at
+             */
             const double catch_angle = 30;
 
             if(front == two_bar){
@@ -829,6 +1136,9 @@ int main(int argc, char** argv){
                 double target_cm = ball_pos_fast[0];
 
                 if(abs(ball_pos_fast[0] - play_height/2) > goal_width/2){
+                    /**
+                     * Which side of the field that the ball is on.
+                     */
                     int side = ball_pos_fast[0] > play_height/2 ? 1 : -1;
                     double target_cm = play_height/2 + side*5;
                     mtr_cmds[lin][two_bar] = {target_cm - offset_two_bar, 100, 1000};
@@ -909,6 +1219,9 @@ int main(int argc, char** argv){
             }
             break;
         }
+        /**
+         * The human player has the ball, and the robot is stopping them from taking a shot on the goal
+         */
         case state_shot_defense:
         {
             pair<side_t, rod_t> closest = closest_rod(ball_pos_fast[1]);
@@ -946,8 +1259,17 @@ int main(int argc, char** argv){
             }
             break;
         }
+        /**
+         * 
+         */
         case state_uncontrolled:
         {
+            /**
+             * @brief Represents the closest rod to the ball position.
+             *
+             * The `closest` variable is a pair that consists of a `side_t` value representing the side of the rod and a `rod_t` value representing the rod number.
+             * It stores the information about the closest rod to the ball position.
+             */
             pair<side_t, rod_t> closest = closest_rod(ball_pos_fast[1]);
             if(closest.first != bot){
                 state = state_defense;
@@ -955,7 +1277,15 @@ int main(int argc, char** argv){
             } else if(!ball_in_motion){
                 state = state_controlled_move;
             }
+            /**
+             * @brief The distance to the closest object.
+             *
+             * This variable represents the distance to the closest object and is stored in the variable `rod`.
+             */
             int rod = closest.second;
+            /**
+             * @brief The index of the closest player to the ball.
+             */
             int plr = closest_plr(rod, ball_pos_fast[0], cur_pos[lin][rod]);
             mtr_cmds[rot][rod] = {35, 5'000, 50'000};
 
@@ -964,6 +1294,9 @@ int main(int argc, char** argv){
             }
             break;
 
+            /**
+             * @brief The difference between the y-coordinate of the ball and the rod.
+             */
             double dy = ball_pos_fast[1]-rod_coord[rod];
             int dir = dy > 0 ? -1 : 1;
             /* if(abs(dy) > 6){ */
@@ -973,6 +1306,12 @@ int main(int argc, char** argv){
             /*     dir = ball_vel[1] > 0 ? -1 : 1; */
             /* } */
 
+            /**
+             * @brief The angle at which the catch is positioned.
+             * 
+             * This variable represents the angle (in degrees) at which the catch is positioned.
+             * It is used to determine the orientation of the catch in the system.
+             */
             double catch_angle = 45;
 
 
@@ -1927,6 +2266,9 @@ int main(int argc, char** argv){
         /******************************************************************************
          * Snake
          ******************************************************************************/
+        /**
+         * Move rods back and forth to prevent shots.
+         */
         case state_snake: {
             static int dir = 1;
             static double t_start = time_ms;
@@ -2055,6 +2397,9 @@ int main(int argc, char** argv){
                 .accel = 250,
             };
             break;
+        /**
+         * print status message
+         */
         case state_unknown:
             status << is_blocked(three_bar, ball_pos_fast[0]-6, rod_pos, 0.3) << ", " << is_blocked(three_bar, ball_pos_fast[0], rod_pos, 0.1) << ", " << is_blocked(three_bar, ball_pos_fast[0]+6, rod_pos, 0.3) << endl;
 
