@@ -1362,6 +1362,13 @@ int main(int argc, char** argv){
             int plr = closest_plr(rod, ball_pos_slow[0], cur_pos[lin][rod]);
             double plr_offset_cm = plr_offset(plr, rod);
 
+            /**
+             * @brief The direction of the ball.
+             *
+             * The `ball_dir` variable represents the direction of the ball.
+             * It is set to 1 if the ball's velocity in the x-axis (ball_vel[0]) is greater than 0,
+             * indicating that the ball is moving to the right. Otherwise, it is set to -1, indicating that the ball is moving to the left.
+             */
             int ball_dir = ball_vel[0] > 0 ? 1 : -1;
 
             const double hit_thresh = 4;
@@ -1370,12 +1377,30 @@ int main(int argc, char** argv){
             const double right_cm = 12;
 
 
+            /**
+             * @brief Calculates the position of the hit point in centimeters.
+             * 
+             * The hit point is calculated based on the ball direction and the positions of the left and right sides.
+             * If the ball direction is 1, the hit point is calculated as the right side position minus half of the hit threshold.
+             * If the ball direction is not 1, the hit point is calculated as the left side position plus half of the hit threshold.
+             * 
+             * @return The position of the hit point in centimeters.
+             */
             double hit_cm = ball_dir == 1 ? right_cm - hit_thresh/2 : left_cm + hit_thresh/2;
             double dt = abs(ball_pos_slow[0] - hit_cm) / ball_vel[0];
             /* double ball_cm = ball_pos_slow[1] + ball_vel[1]*dt; */
             double ball_cm = ball_pos_slow[1];
 
             /* double ball_deg = (rod_coord[rod] - ball_pos_fast[1]) / plr_height / deg_to_rad - 3; */
+            /**
+             * @brief The angle in degrees at which the ball is positioned relative to the rod.
+             *
+             * The `ball_deg` variable represents the angle in degrees at which the ball is positioned
+             * relative to the rod. It is calculated using the `atan` function to determine the angle
+             * between the vertical distance (`rod_coord[rod] - ball_cm`) and the horizontal distance
+             * (`plr_height + plr_levitate - ball_rad/2`). The result is then converted from radians to
+             * degrees by dividing by `deg_to_rad` and subtracting 3.
+             */
             double ball_deg = atan((rod_coord[rod] - ball_cm) / (plr_height+plr_levitate-ball_rad/2)) / deg_to_rad-3;
 
             static double pass_cm;
@@ -1658,14 +1683,40 @@ int main(int argc, char** argv){
          ******************************************************************************/
         case state_controlled_move:
         {
+            /**
+             * @brief Represents the closest rod to the ball position.
+             *
+             * The `closest` variable is a pair consisting of a `side_t` and a `rod_t` value.
+             * It represents the closest rod to the current ball position.
+             */
             pair<side_t, rod_t> closest = closest_rod(ball_pos_fast[1]);
+            /**
+             * @brief Which side the closest rod is on.
+             */
             side_t side = closest.first;
+            /**
+             * @brief Which rod is closest.
+             */
             rod_t rod = closest.second;
             /* status << ball_pos_fast[1]-rod_coord[rod] << endl; */
             /* break; */
+            /**
+             * @brief The position of the ball.
+             * 
+             * This vector stores the position of the ball. It is initially set to the values
+             * of the `ball_pos_fast` vector.
+             */
             vector<double> ball_pos = ball_pos_fast;
             ball_pos[1] -= rod_offsets[rod];
 
+            /**
+             * @brief Represents the index of the closest player to the ball.
+             *
+             * This variable stores the index of the player that is closest to the ball.
+             * It is used to determine which player should be selected to interact with the ball.
+             *
+             * @see closest_plr()
+             */
             int cls_plr = closest_plr(rod, ball_pos_slow[0], cur_pos[lin][rod]);
             double cls_plr_offset_cm = plr_offset(cls_plr, rod);
 
@@ -1767,6 +1818,9 @@ int main(int argc, char** argv){
 
                 end_side = false;
                 target_side = ball_pos[0] <= cmove_target_cm[0] ? 1 : -1;
+                /**
+                 * @brief The distance between the edge of the bumper and the player, plus 1.
+                 */
                 double edge_dist = bumper_width + plr_width+1;
                 if(ball_pos[0] <= edge_dist || ball_pos_fast[0] >= play_height-edge_dist){
                     next_task = cmove_bounce_1;
@@ -1805,6 +1859,11 @@ int main(int argc, char** argv){
             }
             case cmove_side_1:
             {
+                /**
+                 * @brief The rotation direction of the player.
+                 * 
+                 * The `rot_dir` variable determines the rotation direction of the player. It is calculated based on the current position of the player, the offset, ball position, ball radius, player width, player height, and rod coordinates. If the condition `abs(cur_pos[lin][rod] + cls_plr_offset_cm - ball_pos[0]) < ball_rad + plr_width/2 && cur_pos[rot][rod] * deg_to_rad * plr_height >= rod_coord[rod] - ball_pos[1]` is true, `rot_dir` is set to 1, otherwise it is set to -1.
+                 */
                 int rot_dir = abs(cur_pos[lin][rod] + cls_plr_offset_cm - ball_pos[0]) < ball_rad + plr_width/2
                     && cur_pos[rot][rod] * deg_to_rad * plr_height >= rod_coord[rod] - ball_pos[1] ? 1 : -1;
                 
@@ -1818,6 +1877,13 @@ int main(int argc, char** argv){
             }
             case cmove_side_2:
                 wait_rot{
+                    /**
+                     * @brief The distance in centimeters from the ball to the target.
+                     * 
+                     * The `target_cm` variable represents the distance in centimeters from the ball to the target.
+                     * It is calculated by subtracting the sum of the ball radius, half of the foot width, and 0.5 from the x-coordinate of the ball position,
+                     * and then multiplying it by the target side.
+                     */
                     double target_cm = ball_pos[0]-(ball_rad+foot_width/2+0.5)*target_side;
                     plr = closest_plr(rod, target_cm, lin_range_cm[rod]/2);
                     if(rod == three_bar && target_cm <= 15.5) plr = 0; // very hacky, but whatever
@@ -1855,8 +1921,34 @@ int main(int argc, char** argv){
             case cmove_top_1:
             {
                 plr = closest_plr(rod, ball_pos[0], lin_range_cm[rod]/2);
+                /**
+                 * @brief The position of the player on the rod.
+                 *
+                 * This variable represents the position of the player on the rod. It is calculated by adding the player offset to the current position of the rod.
+                 *
+                 * @see plr_offset
+                 * @see cur_pos
+                 *
+                 * @param plr The player object.
+                 * @param rod The rod object.
+                 *
+                 * @return The position of the player on the rod.
+                 */
                 double plr_pos = plr_offset(plr, rod) + cur_pos[lin][rod];
+                /**
+                 * @brief The distance between the center of the foot and the ball.
+                 * 
+                 * This variable represents the distance between the center of the foot and the ball. 
+                 * It is calculated by adding half of the foot width, the radius of the ball, and 0.5.
+                 */
                 double dx = foot_width/2 + ball_rad + 0.5;
+                /**
+                 * @brief The direction of movement.
+                 * 
+                 * This variable determines the direction of movement based on the relative positions of the player and the ball.
+                 * If the player's position is greater than the x-coordinate of the ball's position, the direction is set to 1 (right).
+                 * Otherwise, the direction is set to -1 (left).
+                 */
                 int dir = plr_pos > ball_pos[0] ? 1 : -1;
                 // Prevents timeouts
                 if(!can_plr_reach(plr, rod, ball_pos[0] + dir*dx)){
